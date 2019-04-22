@@ -2,31 +2,36 @@ module CodeMirror
 
 using WebIO
 using JSExpr
+using AssetRegistry
 
 export codemirror
 
+const CMPATH = joinpath((@__DIR__), "..", "assets", "node_modules", "codemirror")
+
 function codemirror(code;
-                    jsmodpath="/pkg/CodeMirror/node_modules/codemirror",
+                    jsmodpath=CMPATH,
                     theme="default",
                     mode="julia",
                     kwargs...)
-    imports=Any["./lib/codemirror"=>"codemirror/lib/codemirror.js",]
+
+    key = AssetRegistry.register(CMPATH)
+    imports=Any["./lib/codemirror"=>"$jsmodpath/lib/codemirror.js",]
 
     modename = mode isa Dict ? mode["name"] : mode
 
     # see https://stackoverflow.com/questions/41753509/with-systemjs-how-do-i-map-urls-between-cdn-libraries-codemirror
     sys_opts = Dict( # I think having to do this is bullshit, but life.
         :map => Dict(
-            "codemirror" => jsmodpath
+            "codemirror" => key
         ),
         :packages=> Dict(
             "codemirror"=> Dict(
-                :map=> Dict("./lib/codemirror"=>  "./lib/codemirror.js")
+                :map=> Dict("./lib/codemirror"=>  "$key/lib/codemirror.js")
             )
         )
     )
 
-    push!(imports, "codemirror/mode/$modename/$modename.js")
+    push!(imports, "$jsmodpath/mode/$modename/$modename.js")
 
     options = Dict(
         "value" => code,
@@ -46,11 +51,12 @@ function codemirror(code;
     if theme != "default"
         push!(css_imports, "$jsmodpath/theme/$theme.css")
     end
-    s = Scope(imports=[imports, css_imports])
+    @show vcat(imports, css_imports)
+    s = Scope(imports=vcat(imports, css_imports))
     s.systemjs_options = sys_opts
-    s.dom = Node(:div,
-                 Node(:style, ".CodeMirror { height: auto; }"),
-                 Node(:div, id="codemirror-root")
+    s.dom = node(:div,
+                 node(:style, ".CodeMirror { height: auto; }"),
+                 node(:div, id="codemirror-root")
             )
     onimport(s, ondeps)
     s
